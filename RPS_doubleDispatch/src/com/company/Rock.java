@@ -1,16 +1,16 @@
 package com.company;
 
 public class Rock extends Attack {
-    public void handleRock(Attack a){
+    public void handle(Rock r){
         System.out.println("Rock v Rock; draw");
     }
-    public void handlePaper(Attack a){
+    public void handle(Paper p){
         System.out.println("Rock v paper; rock loses");
     }
-    public void handleScissors(Attack a){
+    public void handle(Scissors s){
         System.out.println("Rock v Scciessor; rock wins");
     }
     public void handleAttack(Attack a){
-        a.handleRock(this);
+        a.handle(this);
     }
 }

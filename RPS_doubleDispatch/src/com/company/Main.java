@@ -7,6 +7,6 @@ public class Main {
         Attack a2 = new Paper();
         Attack a3 = new Scissors();
 
-        a3.handleAttack(a3);
+        a2.handleAttack(a3);
     }
 }
