@@ -91,29 +91,36 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				//method hasCycles doesn't work, can have 0 cycles and not be empty?
 				throw new IllegalArgumentException("Graph can't be empty!");
 			}
-
-
+			// update set remaining, then chage uses of list players for remaining
 		}
-		/*private static Set<SingleMove> makeSingleMoves(GameSetup setup, List<Player> detectives, Player player, int source){
-			Set<SingleMove> sMoves = null;
+		private static Set<SingleMove> makeSingleMoves(GameSetup setup, List<Player> detectives, Player player, int source){
+			HashSet<SingleMove> sMoves = new HashSet<>(); //type inference
+			boolean add = false;
+			// player is the player that is making the move
 			// TODO create an empty collection of some sort, say, HashSet, to store all the SingleMove we generate
 
-			for(int destination : setup.graph.adjacentNodes(source)) {
+			for(int destination : setup.graph.adjacentNodes(source)) { //int source = node, ie current piece position
 				// TODO find out if destination is occupied by a detective
 				//  if the location is occupied, don't add to the collection of moves to return
+				if(detectives.stream().noneMatch(x->x.location() == destination)) { ///List.stream(detectives). ->
+					add = true;
+				}
 
 				for(Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of()) ) {
 					// TODO find out if the player has the required tickets
 					//  if it does, construct a SingleMove and add it the collection of moves to return
+					//&& player.has(setup.graph.edgeValue(source,destination).isPresent()
+					//sMoves.add(new SingleMove(player.piece(), source, player));
+					if (player.has(t.requiredTicket()) && add){sMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(),destination));}
 				}
-
 				// TODO consider the rules of secret moves here
 				//  add moves to the destination via a secret ticket if there are any left with the player
+				
 			}
 
 			// TODO return the collection of moves
 			return sMoves;
-		}*/
+		}
 
 
 
