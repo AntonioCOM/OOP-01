@@ -15,6 +15,8 @@ import uk.ac.bris.cs.scotlandyard.model.Move.*;
 import uk.ac.bris.cs.scotlandyard.model.Piece.*;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.*;
 import static com.google.common.base.Preconditions.checkNotNull;
+//import static com.google.common.graph.Graphs.*;
+import static com.google.common.graph.Graphs.hasCycle;
 import static java.util.Collections.frequency;
 
 /**
@@ -70,7 +72,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 
 			if(setup.moves.isEmpty()) throw new IllegalArgumentException("Moves is empty!");
 			if(!mrX.isMrX()) throw new IllegalArgumentException("MrX created incorrectly, has to be black and can't be a detective");
-			for(int i = 0; i<detectives.size(); i++) {
+			for(int i = 0; i<detectives.size(); i++) { // loop to pass GSCTests
 				if(detectives.get(i).isMrX()){throw new IllegalArgumentException("detective created incorrectly, swapped with MrX etc");}
 				//if(detectives.get(i).piece() /*.equals()????*/ == detectives.get(counter).piece() || detectives.get(i).location() == detectives.get(counter).location()){throw new IllegalArgumentException("duplicate detective or same location");}
 				int fd = frequency(detectives, detectives.get(i));
@@ -81,7 +83,39 @@ public final class MyGameStateFactory implements Factory<GameState>{
 					if(detectives.get(j).location() == detectives.get(i).location()){throw new IllegalArgumentException("detectives locations overlap");}
 				}
 			}
+			if(this.setup.graph.nodes().isEmpty() || this.setup.graph.edges().isEmpty()){
+				//The graph with no vertices and no edges is sometimes called the null graph or empty graph,Options:
+				//1. check if .nodes or .edges is empty
+				//2. attempt traverse and check, ie has next
+				//3.create empty and compare
+				//method hasCycles doesn't work, can have 0 cycles and not be empty?
+				throw new IllegalArgumentException("Graph can't be empty!");
+			}
+
+
 		}
+		/*private static Set<SingleMove> makeSingleMoves(GameSetup setup, List<Player> detectives, Player player, int source){
+			Set<SingleMove> sMoves = null;
+			// TODO create an empty collection of some sort, say, HashSet, to store all the SingleMove we generate
+
+			for(int destination : setup.graph.adjacentNodes(source)) {
+				// TODO find out if destination is occupied by a detective
+				//  if the location is occupied, don't add to the collection of moves to return
+
+				for(Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of()) ) {
+					// TODO find out if the player has the required tickets
+					//  if it does, construct a SingleMove and add it the collection of moves to return
+				}
+
+				// TODO consider the rules of secret moves here
+				//  add moves to the destination via a secret ticket if there are any left with the player
+			}
+
+			// TODO return the collection of moves
+			return sMoves;
+		}*/
+
+
 
 		/**
 		 * @return the current game setup
