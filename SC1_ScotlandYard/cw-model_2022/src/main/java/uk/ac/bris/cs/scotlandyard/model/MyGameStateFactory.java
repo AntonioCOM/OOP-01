@@ -2,7 +2,7 @@ package uk.ac.bris.cs.scotlandyard.model;
 
 import com.google.common.collect.ImmutableList;
 import javax.annotation.Nonnull;
-import com.google.common.collect.ImmutableMap;
+
 import com.google.common.collect.ImmutableSet;
 import java.util.*;
 import java.util.ArrayList;
@@ -12,7 +12,6 @@ import java.util.Set;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 import uk.ac.bris.cs.scotlandyard.model.Move.*;
-import uk.ac.bris.cs.scotlandyard.model.Piece.*;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.*;
 import static com.google.common.base.Preconditions.checkNotNull;
 //import static com.google.common.graph.Graphs.*;
@@ -55,7 +54,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		private ImmutableList<LogEntry> log; // to hold the travel log and count the moves Mr has taken, (empty at the starting round)
 		private Player mrX; //
 		private List<Player> detectives; // list of detectives in the game
-		private ImmutableSet<Move> moves; //to hold the currently possible/available moves
+		private ImmutableSet<Move> AvMoves; //to hold the currently possible/available moves !!!changed moves to AvMoves!!!!
 		private ImmutableSet<Piece> winner; // to hold the current winner(s)
 
 
@@ -70,19 +69,28 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			this.mrX = checkNotNull(mrX,"mrX(player) can't be null");
 			this.detectives = checkNotNull(detectives,"detectives(List<Player>) can't be null");
 
+
 			if(setup.moves.isEmpty()) throw new IllegalArgumentException("Moves is empty!");
 			if(!mrX.isMrX()) throw new IllegalArgumentException("MrX created incorrectly, has to be black and can't be a detective");
-			for(int i = 0; i<detectives.size(); i++) { // loop to pass GSCTests
-				if(detectives.get(i).isMrX()){throw new IllegalArgumentException("detective created incorrectly, swapped with MrX etc");}
+			HashSet<Move> AMoves = new HashSet<>();
+			for(int i = 0; i<this.detectives.size(); i++) {
+				AMoves.addAll(makeSingleMoves(setup, this.detectives, this.detectives.get(i), this.detectives.get(i).location()));
+				AMoves.addAll(makeDoubleMoves(setup, this.detectives, this.detectives.get(i), this.detectives.get(i).location()));
+				if(this.detectives.get(i).isMrX()){throw new IllegalArgumentException("detective created incorrectly, swapped with MrX etc");}
 				//if(detectives.get(i).piece() /*.equals()????*/ == detectives.get(counter).piece() || detectives.get(i).location() == detectives.get(counter).location()){throw new IllegalArgumentException("duplicate detective or same location");}
-				int fd = frequency(detectives, detectives.get(i));
+				int fd = frequency(this.detectives, this.detectives.get(i));
 				if(fd != 1 ){throw new IllegalArgumentException("detectives created incorrectly");}
 				// detectives can't have secret or double tickets
-				if(detectives.get(i).has(Ticket.SECRET) || detectives.get(i).has(Ticket.DOUBLE)){throw new IllegalArgumentException("detectives have illegal tickets");}
-				for(int j = i+1; j<detectives.size();j++){
-					if(detectives.get(j).location() == detectives.get(i).location()){throw new IllegalArgumentException("detectives locations overlap");}
+				if(this.detectives.get(i).has(Ticket.SECRET) || detectives.get(i).has(Ticket.DOUBLE)){throw new IllegalArgumentException("detectives have illegal tickets");}
+				for(int j = i+1; j<this.detectives.size();j++){
+					if(this.detectives.get(j).location() == this.detectives.get(i).location()){
+						throw new IllegalArgumentException("detectives locations overlap");
+					}
 				}
 			}
+			AMoves.addAll(makeSingleMoves(setup, this.detectives, mrX, mrX.location()));
+			AMoves.addAll(makeDoubleMoves(setup, this.detectives, mrX, mrX.location()));
+			this.AvMoves = ImmutableSet.copyOf(AMoves);
 			if(this.setup.graph.nodes().isEmpty() || this.setup.graph.edges().isEmpty()){
 				//The graph with no vertices and no edges is sometimes called the null graph or empty graph,Options:
 				//1. check if .nodes or .edges is empty
@@ -91,38 +99,8 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				//method hasCycles doesn't work, can have 0 cycles and not be empty?
 				throw new IllegalArgumentException("Graph can't be empty!");
 			}
-			// update set remaining, then chage uses of list players for remaining
+			// update set remaining, then change uses of list players for remaining
 		}
-		private static Set<SingleMove> makeSingleMoves(GameSetup setup, List<Player> detectives, Player player, int source){
-			HashSet<SingleMove> sMoves = new HashSet<>(); //type inference
-			boolean add = false;
-			// player is the player that is making the move
-			// TODO create an empty collection of some sort, say, HashSet, to store all the SingleMove we generate
-
-			for(int destination : setup.graph.adjacentNodes(source)) { //int source = node, ie current piece position
-				// TODO find out if destination is occupied by a detective
-				//  if the location is occupied, don't add to the collection of moves to return
-				if(detectives.stream().noneMatch(x->x.location() == destination)) { ///List.stream(detectives). ->
-					add = true;
-				}
-
-				for(Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of()) ) {
-					// TODO find out if the player has the required tickets
-					//  if it does, construct a SingleMove and add it the collection of moves to return
-					//&& player.has(setup.graph.edgeValue(source,destination).isPresent()
-					//sMoves.add(new SingleMove(player.piece(), source, player));
-					if (player.has(t.requiredTicket()) && add){sMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(),destination));}
-				}
-				// TODO consider the rules of secret moves here
-				//  add moves to the destination via a secret ticket if there are any left with the player
-				
-			}
-
-			// TODO return the collection of moves
-			return sMoves;
-		}
-
-
 
 		/**
 		 * @return the current game setup
@@ -260,7 +238,9 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			});
 
 			//if counter == num of detectives -> mrx is winner
-			if (ref.counter == detectives.size()){winner = ImmutableSet.of(mrX.piece()); System.out.println("mrX wins, no more detective");}
+			if (ref.counter == detectives.size()){
+				winner = ImmutableSet.of(mrX.piece()); System.out.println("mrX wins, no more detective");
+			}
 
 			//else if(){}
 			//if user-defined number of rounds has passed -> mrx is winner
@@ -275,15 +255,159 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		 */
 		@Nonnull
 		@Override
-		public ImmutableSet<Move> getAvailableMoves() {
-			ImmutableSet<Move> AvMoves = ImmutableSet.of();
-			//return available moves
-			//not this!!!  0 if there is a winner
-			// 0 if no more tickets in ticketboard, (or in drawpile)
-			// num of tickets a player has left, num of rounds left
+		public ImmutableSet<Move> getAvailableMoves() {return AvMoves;   /*HashSet<Move> AMoves = new HashSet<>();
+			//return possible moves that can be done, maybe use remaining player rather than all players passed as parameter
+			for(Player p : detectives){
+				AMoves.addAll(makeSingleMoves(setup, detectives, p, p.location()));
+				AMoves.addAll(makeDoubleMoves(setup, detectives, p, p.location()));
+			}
+			AMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
+			AMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
 
-			return AvMoves;
+			moves = ImmutableSet.copyOf(AMoves);
+			System.out.println(moves);
+			return ImmutableSet.copyOf(AMoves); // moves*/ }
+
+		private static Set<SingleMove> makeSingleMoves
+				(GameSetup setup, List<Player> detectives, Player player, int source){
+			HashSet<SingleMove> sMoves = new HashSet<>(); //type inference
+			// player is the player that is making the move
+			// TODO create an empty collection of some sort, say, HashSet, to store all the SingleMove we generate
+
+			for(int destination1 : setup.graph.adjacentNodes(source)) { //int source = node, ie current piece position
+				// TODO find out if destination is occupied by a detective
+				if(detectives.stream().noneMatch(x->x.location() == destination1)) { ///List.stream(detectives). ->
+					for (Transport t1 : setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of())) {
+						// TODO find out if the player has the required tickets
+						//  if it does, construct a SingleMove and add it the collection of moves to return
+						//&& player.has(setup.graph.edgeValue(source,destination).isPresent()
+						//sMoves.add(new SingleMove(player.piece(), source, player));
+						if (player.has(t1.requiredTicket())) {
+							sMoves.add(new SingleMove(player.piece(), source, t1.requiredTicket(), destination1));
+						}
+						/* double move calculation
+						if(player.has(Ticket.DOUBLE) && (player.has(t1.requiredTicket()) || player.has(Ticket.SECRET))){ // double move
+							for(int destination2 : setup.graph.adjacentNodes(destination1)) {
+								// TODO find out if destination is occupied by a detective
+								if(detectives.stream().noneMatch(x->x.location() == destination2)){
+									for (Transport t2 : setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of())) {
+										// TODO find out if the player has the required tickets
+										//  if it does, construct a SingleMove and add it the collection of moves to return
+										if (player.has(t2.requiredTicket())) {
+											if((t1.requiredTicket() == t2.requiredTicket()) && player.hasAtLeast(t1.requiredTicket(), 2) ){ // use .equals()????
+												sMoves.add(new DoubleMove(player.piece(), source, t1.requiredTicket(), destination1, t2.requiredTicket(), destination2));
+											}
+											else if(t1.requiredTicket() != t2.requiredTicket()){
+												sMoves.add(new DoubleMove(player.piece(), source, t1.requiredTicket(), destination1, t2.requiredTicket(), destination2));
+											}
+										}
+
+										// Use secret ticket for first move
+
+									}
+									if (player.has(Ticket.SECRET)
+											&& !((setup.graph.edgeValueOrDefault(destination1, destination2, ImmutableSet.of(Transport.FERRY))).contains(Transport.FERRY))) {  // could use stream.none match, also set default value to ferry just in case
+										sMoves.add(new DoubleMove(player.piece(), source, t1.requiredTicket(), destination1, Ticket.SECRET, destination2));
+									}
+									if(player.hasAtLeast(Ticket.SECRET,2) && !((setup.graph.edgeValueOrDefault(destination1, destination2, ImmutableSet.of(Transport.FERRY))).contains(Transport.FERRY)) && !((setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of(Transport.FERRY))).contains(Transport.FERRY))){
+										sMoves.add(new DoubleMove(player.piece(), source, Ticket.SECRET, destination1, Ticket.SECRET, destination2));
+									}
+
+									// case in which first ticket used is secret and second is the required ticket
+									//if (player.has(Ticket.SECRET)
+									//		&& !((setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of(Transport.FERRY))).contains(Transport.FERRY))) {  // could use stream.none match, also set default value to ferry just in case
+									//	sMoves.add(new DoubleMove(player.piece(), source, Ticket.SECRET, destination1, t2.requriedTicket, destination2));
+									//}
+								}
+							}
+						}*/
+					}
+
+					// TODO consider the rules of secret moves here
+					//  add moves to the destination via a secret ticket if there are any left with the player
+					if (player.has(Ticket.SECRET)
+							&& !((setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of(Transport.FERRY))).contains(Transport.FERRY))) {  // could use stream.none match, also set default value to ferry just in case
+						sMoves.add(new SingleMove(player.piece(), source, Ticket.SECRET, destination1));
+					}
+				}
+			}
+			// TODO return the collection of moves
+			return sMoves;
 		}
+
+		private static Set<DoubleMove> makeDoubleMoves
+				(GameSetup setup, List<Player> detectives, Player player, int source){
+			HashSet<DoubleMove> dMoves = new HashSet<>();
+			ArrayList<SingleMove> firstM = new ArrayList<>(makeSingleMoves(setup, detectives, player, source));
+			HashSet<SingleMove> secondM;
+			// check if more than 2 rounds left in the game
+			if(/*player.isMrX() &&*/ player.has(Ticket.DOUBLE)) {
+				for (SingleMove firstSM : firstM){//(int i = 0; i < firstM.size(); i++) { // iterate through first single moves
+					secondM = new HashSet<>(makeSingleMoves(setup, detectives, player, firstSM.destination)); // calculate possible second moves
+					for (SingleMove secondSM : secondM){//(int j = 0; j < secondM.size(); j++) {// iterate through second single moves
+						// check if player has requried ticket to complete secondSM, given the completion of fistSM
+						if(secondSM.ticket == firstSM.ticket && player.hasAtLeast(secondSM.ticket, 2)){ // check if p
+							dMoves.add(new DoubleMove(player.piece(), source, firstSM.ticket, firstSM.destination, secondSM.ticket, secondSM.destination));
+						}
+						else if(secondSM.ticket != firstSM.ticket){
+							dMoves.add(new DoubleMove(player.piece(), source, firstSM.ticket, firstSM.destination, secondSM.ticket, secondSM.destination));
+						}
+					}
+				}
+			}
+			/*
+			HashSet<DoubleMove> dMoves = new HashSet<>(); //type inference
+			HashSet<SingleMove> nd_move = new HashSet<>(); //type inference
+			List<Move.SingleMove> sm= new ArrayList<>(makeSingleMoves(setup, detectives, player, source));
+
+			sm = makeSingleMoves(setup, detectives, player, source).stream()
+					.filter(x -> (x.commencedBy().isMrX() && player.has(Ticket.DOUBLE)))
+					.toList();
+
+			for(int i =0; i<sm.size(); i++){ // loop through possible single moves
+				nd_move.addAll(makeSingleMoves(setup, detectives, player, sm.get(i).destination));
+
+				for(int destination2 : setup.graph.adjacentNodes(sm.get(i).destination)){ // loop through adj nodes to 1 destination
+					if(detectives.stream().noneMatch(x->x.location() == destination2)){
+						for (Transport t2 : setup.graph.edgeValueOrDefault(sm.get(i).destination, destination2, ImmutableSet.of())) {
+
+						}
+					}
+				}
+			}
+
+
+
+
+			/*if(player.has(Ticket.DOUBLE) && (player.has(t1.requiredTicket()) || player.has(Ticket.SECRET))){ // double move
+				for(int destination2 : setup.graph.adjacentNodes(destination1)) {
+					// TODO find out if destination is occupied by a detective
+					if(detectives.stream().noneMatch(x->x.location() == destination2)){
+						for (Transport t2 : setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of())) {
+							// TODO find out if the player has the required tickets
+							//  if it does, construct a SingleMove and add it the collection of moves to return
+							if (player.has(t2.requiredTicket())) {
+								if((t1.requiredTicket() == t2.requiredTicket()) && player.hasAtLeast(t1.requiredTicket(), 2) ){ // use .equals()????
+									sMoves.add(new DoubleMove(player.piece(), source, t1.requiredTicket(), destination1, t2.requiredTicket(), destination2));
+								}
+								else if(t1.requiredTicket() != t2.requiredTicket()){
+									sMoves.add(new DoubleMove(player.piece(), source, t1.requiredTicket(), destination1, t2.requiredTicket(), destination2));
+								}
+							}
+							// Use secret ticket for first move
+							// use 2 secret tickets for double move
+						}
+						if (player.has(Ticket.SECRET)
+								&& !((setup.graph.edgeValueOrDefault(destination1, destination2, ImmutableSet.of(Transport.FERRY))).contains(Transport.FERRY))) {  // could use stream.none match, also set default value to ferry just in case
+							sMoves.add(new DoubleMove(player.piece(), source, t1.requiredTicket(), destination1, Ticket.SECRET, destination2));
+						}
+					}
+				}
+			}*/
+
+			return dMoves;
+		}
+
 
 		/**
 		 * Computes the next game state given a move from {@link #getAvailableMoves()} has been
@@ -297,6 +421,24 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public GameState advance(Move move) {
+			if(!AvMoves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
+
+			// do I really need to use the visitor pattern
+
+			if(move.commencedBy().isMrX()){
+				if(move.toString().contains("x2")){ // double move
+
+				}
+				else{
+
+				}
+			}
+			else if (move.commencedBy().isDetective()){
+
+
+			}
+
+
 			return null;
 		}
 	}
