@@ -50,7 +50,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 
 	private final class MyGameState implements GameState{
 		private GameSetup setup; //to return it, as well as have access to the game graph and Mr X reveal moves
-		private ImmutableSet<Piece> remaining; //to hold which pieces (are still in the game) can still move in current round,(just MrX at the starting round)
+		private ImmutableSet<Piece> remaining; //to hold which pieces  can still move in current round,(just MrX at the starting round)
 		private ImmutableList<LogEntry> log; // to hold the travel log and count the moves Mr has taken, (empty at the starting round)
 		private Player mrX; //
 		private List<Player> detectives; // list of detectives in the game
@@ -69,13 +69,14 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			this.mrX = checkNotNull(mrX,"mrX(player) can't be null");
 			this.detectives = checkNotNull(detectives,"detectives(List<Player>) can't be null");
 
+			//this.remaining = ImmutableSet.of(this.mrX.piece());
 
 			if(setup.moves.isEmpty()) throw new IllegalArgumentException("Moves is empty!");
 			if(!mrX.isMrX()) throw new IllegalArgumentException("MrX created incorrectly, has to be black and can't be a detective");
 			HashSet<Move> AMoves = new HashSet<>();
 			for(int i = 0; i<this.detectives.size(); i++) {
-				AMoves.addAll(makeSingleMoves(setup, this.detectives, this.detectives.get(i), this.detectives.get(i).location()));
-				AMoves.addAll(makeDoubleMoves(setup, this.detectives, this.detectives.get(i), this.detectives.get(i).location()));
+				//AMoves.addAll(makeSingleMoves(setup, this.detectives, this.detectives.get(i), this.detectives.get(i).location()));
+				//AMoves.addAll(makeDoubleMoves(setup, this.detectives, this.detectives.get(i), this.detectives.get(i).location()));
 				if(this.detectives.get(i).isMrX()){throw new IllegalArgumentException("detective created incorrectly, swapped with MrX etc");}
 				//if(detectives.get(i).piece() /*.equals()????*/ == detectives.get(counter).piece() || detectives.get(i).location() == detectives.get(counter).location()){throw new IllegalArgumentException("duplicate detective or same location");}
 				int fd = frequency(this.detectives, this.detectives.get(i));
@@ -88,18 +89,35 @@ public final class MyGameStateFactory implements Factory<GameState>{
 					}
 				}
 			}
-			AMoves.addAll(makeSingleMoves(setup, this.detectives, mrX, mrX.location()));
-			AMoves.addAll(makeDoubleMoves(setup, this.detectives, mrX, mrX.location()));
-			this.AvMoves = ImmutableSet.copyOf(AMoves);
-			if(this.setup.graph.nodes().isEmpty() || this.setup.graph.edges().isEmpty()){
-				//The graph with no vertices and no edges is sometimes called the null graph or empty graph,Options:
+			//AMoves.addAll(makeSingleMoves(setup, this.detectives, mrX, mrX.location()));
+			//AMoves.addAll(makeDoubleMoves(setup, this.detectives, mrX, mrX.location()));
+			//this.AvMoves = ImmutableSet.copyOf(AMoves);
+			if(this.setup.graph.nodes().isEmpty() || this.setup.graph.edges().isEmpty()){ /*The graph with no vertices and no edges is sometimes called the null graph or empty graph,Options:
 				//1. check if .nodes or .edges is empty
 				//2. attempt traverse and check, ie has next
 				//3.create empty and compare
-				//method hasCycles doesn't work, can have 0 cycles and not be empty?
-				throw new IllegalArgumentException("Graph can't be empty!");
+				//method hasCycles doesn't work, can have 0 cycles and not be empty?*/ throw new IllegalArgumentException("Graph can't be empty!");}
+			for(Piece p : this.remaining ){
+				AMoves.addAll(makeSingleMoves(setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location() ));
+				AMoves.addAll(makeDoubleMoves(setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location()));
 			}
+			this.AvMoves = ImmutableSet.copyOf(AMoves);
 			// update set remaining, then change uses of list players for remaining
+		}
+
+		public Optional<Player> PieceGetPlayer(Piece piecee){
+			var ref = new Object() {
+				Player id = null;
+			};
+
+			if(piecee.isMrX()) {ref.id = this.mrX; }
+
+			else if (piecee.isDetective()) {
+				this.detectives.forEach((p) -> {
+					if (p.piece() == piecee) {ref.id = p;}
+				});
+			}
+			return Optional.ofNullable(ref.id);
 		}
 
 		/**
@@ -125,12 +143,12 @@ public final class MyGameStateFactory implements Factory<GameState>{
 							.build();
 			*/
 			List<Piece> DP = new ArrayList<>();
-			for(int i = 0; i <detectives.size(); i++){DP.add(detectives.get(i).piece());}
+			for(int i = 0; i <this.detectives.size(); i++){DP.add(this.detectives.get(i).piece());}
 
 			/*static*/
 			final ImmutableSet<Piece> GSFplayers =
 					ImmutableSet.<Piece>builder()
-							.add(mrX.piece())
+							.add(this.mrX.piece())
 							//.addAll( GSFdetectives.iterator() GSFdetectives.piece())
 							//GSFdetectives.forEach((p) -> (List<Piece> DP =  p.piece()));
 							.addAll(DP)
@@ -148,14 +166,18 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public Optional<Integer> getDetectiveLocation(Piece.Detective detective) {
-			var ref = new Object() {
+			/*var ref = new Object() {
 				Player id = null;
 			};
+
 			detectives.forEach((p) -> {
 				if(p.piece() == detective ){ref.id = p;} //&&!mrX	???
 			});
-			if(ref.id == null){return Optional.empty();}
-			return Optional.ofNullable(ref.id.location()); // ref.id can't be null,due to .location. otherwise ofNullable is sufficient
+			*/
+			Player id = PieceGetPlayer(detective).orElse(null);
+
+			if(id == null){return Optional.empty();}
+			return Optional.ofNullable(id.location()); // ref.id can't be null,due to .location. otherwise ofNullable is sufficient
 		}
 
 		/**
@@ -165,19 +187,20 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
-			var ref = new Object() {
+			/*var ref = new Object() {
 				Player id = null;
 			};
 
-			if(piece.isMrX()){ref.id = mrX;/*System.out.println("Piece provided is mrx:"+ ref.id);*/}
+			if(piece.isMrX()){ref.id = mrX;}
 
 			else if (piece.isDetective()) {
 				detectives.forEach((p) -> {
 					//id = p.piece();
-					if (p.piece() == piece) {ref.id = p;/*System.out.println("Piece provided is:"+ p);*/}
+					if (p.piece() == piece) {ref.id = p;}
 				});
-			}
-			if(ref.id == null){return Optional.empty();}
+			}*/
+			Player id = PieceGetPlayer(piece).orElse(null);
+			if(id == null){return Optional.empty();}
 
 			TicketBoard GSFTB = new TicketBoard() {
 				@Override
@@ -186,10 +209,9 @@ public final class MyGameStateFactory implements Factory<GameState>{
 					 * @param ticket the ticket to check count for
 					 * @return the amount of ticket,that player has, always &gt;>= 0
 					 */
-					return ref.id.tickets().get(ticket);
+					return id.tickets().get(ticket);
 				}
 			};
-
 			return Optional.ofNullable(GSFTB);
 		}
 
@@ -255,7 +277,9 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		 */
 		@Nonnull
 		@Override
-		public ImmutableSet<Move> getAvailableMoves() {return AvMoves;   /*HashSet<Move> AMoves = new HashSet<>();
+		public ImmutableSet<Move> getAvailableMoves() {
+			// get avmoves from player in remaining, do this in constructor
+			return AvMoves; /*HashSet<Move> AMoves = new HashSet<>();
 			//return possible moves that can be done, maybe use remaining player rather than all players passed as parameter
 			for(Player p : detectives){
 				AMoves.addAll(makeSingleMoves(setup, detectives, p, p.location()));
@@ -266,7 +290,8 @@ public final class MyGameStateFactory implements Factory<GameState>{
 
 			moves = ImmutableSet.copyOf(AMoves);
 			System.out.println(moves);
-			return ImmutableSet.copyOf(AMoves); // moves*/ }
+			return ImmutableSet.copyOf(AMoves); // moves*/
+		}
 
 		private static Set<SingleMove> makeSingleMoves
 				(GameSetup setup, List<Player> detectives, Player player, int source){
@@ -423,6 +448,8 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		public GameState advance(Move move) {
 			if(!AvMoves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
 
+
+			/*
 			// do I really need to use the visitor pattern
 
 			if(move.commencedBy().isMrX()){
@@ -436,9 +463,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			else if (move.commencedBy().isDetective()){
 
 
-			}
-
-
+			}*/ // just use visitor pattern. other way would require reflection pattern etc and will be more complicated
 			return null;
 		}
 	}
