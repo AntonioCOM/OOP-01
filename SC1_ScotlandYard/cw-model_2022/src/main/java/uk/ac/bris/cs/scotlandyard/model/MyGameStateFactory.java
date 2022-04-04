@@ -94,18 +94,15 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				//3.create empty and compare
 				//method hasCycles doesn't work, can have 0 cycles and not be empty?*/ throw new IllegalArgumentException("Graph can't be empty!");}
 			for(Piece p : this.remaining ){
-				AMoves.addAll(makeSingleMoves(setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location() ));
-				if(this.log.size() +2 <= setup.moves.size()){ // check if enough rounds left to make a double move
-					AMoves.addAll(makeDoubleMoves(setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location()));
+				AMoves.addAll(makeSingleMoves(this.setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location() ));
+				if(this.log.size() +2 <= this.setup.moves.size()){ // check if enough rounds left to make a double move
+					AMoves.addAll(makeDoubleMoves(this.setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location()));
 				}
 			}
 			this.AvMoves = ImmutableSet.copyOf(AMoves);
 			// update set remaining, then change uses of list players for remaining
 		}
 
-		public ImmutableSet<Piece> getRemaining(){
-			return remaining;
-		}
 
 		public Optional<Player> PieceGetPlayer(Piece piecee){
 			var ref = new Object() {
@@ -396,6 +393,8 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public GameState advance(Move move) {
+			//System.out.println(remaining);
+			//System.out.println(AvMoves);
 			if(!AvMoves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
 			/*
 			// do I really need to use the visitor pattern
@@ -415,8 +414,9 @@ public final class MyGameStateFactory implements Factory<GameState>{
 
 
 			GameState NewGS = move.accept(new Visitor<GameState>(){
-				//int DM = 0;
+				int dm = 0;
 				@Override public GameState visit(SingleMove singleMove){
+					//System.out.println(remaining);
 					if(singleMove.commencedBy().isMrX()){
 
 						ArrayList<LogEntry> LE = new ArrayList<>(log);
@@ -430,68 +430,74 @@ public final class MyGameStateFactory implements Factory<GameState>{
 						}
 						mrX.use(singleMove.ticket);
 						mrX = mrX.at(singleMove.destination);
-						//if(DM == 0) {
+
+						if(dm == 0) {
 							ArrayList<Piece> DPieces = new ArrayList<>();
 							for (Player p : detectives) {
 								DPieces.add(p.piece());
 							}
 							remaining = ImmutableSet.copyOf(DPieces);
-							System.out.println(remaining);
-						//}
+							//System.out.println(remaining);
+						}
 						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
 					}
 
 					else if(singleMove.commencedBy().isDetective()){
 						Player p = PieceGetPlayer(singleMove.commencedBy()).get();
-						p = PieceGetPlayer(singleMove.commencedBy()).get().at(singleMove.destination);
+						//System.out.println("player moving: " + p + "currently at: " + p.location());
+						int a = 0;
+						for(int i=0; i<detectives.size(); i++){
+							if(detectives.get(i).piece() == singleMove.commencedBy()){
+								a = i;
+								break;
+							}
+						}
+						p = p.at(singleMove.destination);
+						//System.out.println("moved to:" + p);
 						p.use(singleMove.ticket);
 						mrX.give(singleMove.ticket);
+						ArrayList <Player> dAL = new ArrayList<>(detectives);
+						dAL.add(a,p);
+						dAL.remove(a+1);
+						detectives = ImmutableList.copyOf(dAL);
 						remaining = ImmutableSet.copyOf(remaining.stream().filter(x -> x !=singleMove.commencedBy()).toList());
 						if(remaining.isEmpty()){
 							remaining = ImmutableSet.of(mrX.piece());
 						}
-						System.out.println(remaining);
+						//System.out.println(remaining);
 						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
 
 					}
 					return null;
 				}
 				@Override public GameState visit(DoubleMove doubleMove){
+					//System.out.println("visit DM");
 					SingleMove FSM = new SingleMove(doubleMove.commencedBy(), doubleMove.source(), doubleMove.ticket1, doubleMove.destination1);
 					SingleMove SSM = new SingleMove(doubleMove.commencedBy(), doubleMove.destination1, doubleMove.ticket2, doubleMove.destination2);
-					// not working bcs shouldn't change remaining in the fSM, only after ssm
-					//DM = 1;
-					GameState x;
-					x = visit(FSM);
-					//DM = 0;
-					GameState y;
-					// y = x.visit(SSM);
-					return x;
-					/*if(doubleMove.commencedBy().isMrX()) {
 
-
-						List<LogEntry> LE = List.copyOf(log);
-
-						if(setup.moves.get(log.size())) { // it is a reveal round
-							LE.add(LogEntry.reveal(singleMove.ticket, mrX.location()) );
-							log = ImmutableList.copyOf(LE);
-						}
-						else if(!setup.moves.get(log.size())){ // hidden move round
-							LE.add(LogEntry.hidden(singleMove.ticket));
-							log = ImmutableList.copyOf(LE);
-						}
-
-						mrX.use(singleMove.ticket);
-						mrX = mrX.at(singleMove.destination);
-						ArrayList<Piece> DPieces = new ArrayList<>();
-						for(Player p: detectives){DPieces.add(p.piece());}
-						remaining = ImmutableSet.copyOf(DPieces);
-						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
-
+					/*ArrayList<LogEntry> LE = new ArrayList<>(log);
+					if(setup.moves.get(log.size())) {
+						LE.add(LogEntry.reveal(FSM.ticket, mrX.location()) );
+						log = ImmutableList.copyOf(LE);
 					}
-					else if(doubleMove.commencedBy().isDetective()){
+					else if(!setup.moves.get(log.size())){
+						LE.add(LogEntry.hidden(FSM.ticket));
+						log = ImmutableList.copyOf(LE);
+					}
+					mrX.use(FSM.ticket);
+					mrX = mrX.at(FSM.destination);
 
-					}*/
+					return  visit(SSM); */
+
+					//return new MyGameState(getSetup(), remaining, log, mrX, detectives);
+
+					dm = 1;
+					GameState xd;
+					xd = visit(FSM);
+					dm = 0;
+					//GameState y;
+					xd = visit(SSM);
+					return xd;
 				}
 
 			});
