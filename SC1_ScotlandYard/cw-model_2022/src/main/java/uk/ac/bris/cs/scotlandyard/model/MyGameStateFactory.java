@@ -70,14 +70,14 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			this.log = checkNotNull(log,"Travel log(List<LogEntry>) can't be null");
 			this.mrX = checkNotNull(mrX,"mrX(player) can't be null");
 			this.detectives = checkNotNull(detectives,"detectives(List<Player>) can't be null");
+			this.winner = determineWinner();
 			HashSet<Move> AMoves = new HashSet<>();
-			//this.remaining = ImmutableSet.of(this.mrX.piece());
+
 
 			if(setup.moves.isEmpty()) throw new IllegalArgumentException("Moves is empty!");
 			if(!mrX.isMrX()) throw new IllegalArgumentException("MrX created incorrectly, has to be black and can't be a detective");
 			for(int i = 0; i<this.detectives.size(); i++) {
 				if(this.detectives.get(i).isMrX()){throw new IllegalArgumentException("detective created incorrectly, swapped with MrX etc");}
-				//if(detectives.get(i).piece() /*.equals()????*/ == detectives.get(counter).piece() || detectives.get(i).location() == detectives.get(counter).location()){throw new IllegalArgumentException("duplicate detective or same location");}
 				int fd = frequency(this.detectives, this.detectives.get(i));
 				if(fd != 1 ){throw new IllegalArgumentException("detectives created incorrectly");}
 				// detectives can't have secret or double tickets
@@ -93,18 +93,51 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				//2. attempt traverse and check, ie has next
 				//3.create empty and compare
 				//method hasCycles doesn't work, can have 0 cycles and not be empty?*/ throw new IllegalArgumentException("Graph can't be empty!");}
-			for(Piece p : this.remaining ){
-				AMoves.addAll(makeSingleMoves(this.setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location() ));
-				if(this.log.size() +2 <= this.setup.moves.size()){ // check if enough rounds left to make a double move
+
+			for (Piece p : this.remaining) {
+				AMoves.addAll(makeSingleMoves(this.setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location()));
+				if (this.log.size() + 2 <= this.setup.moves.size()) { // check if enough rounds left to make a double move
 					AMoves.addAll(makeDoubleMoves(this.setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location()));
 				}
 			}
 			this.AvMoves = ImmutableSet.copyOf(AMoves);
-			// update set remaining, then change uses of list players for remaining
 		}
 
+		private ImmutableSet<Piece> determineWinner(){
+			this.winner = ImmutableSet.of(); //testWinningPlayerIsEmptyInitially
+			ArrayList<Piece> dP = new ArrayList<>();
+			HashSet<Move> XM = new HashSet<>();
 
-		public Optional<Player> PieceGetPlayer(Piece piecee){
+			var ref = new Object() {
+				int counter = 0;
+			};
+
+			XM.addAll(makeSingleMoves(this.setup, this.detectives, this.mrX, this.mrX.location() ));
+			if(this.log.size() +2 <= this.setup.moves.size()){
+				XM.addAll(makeDoubleMoves(this.setup, this.detectives, this.mrX, this.mrX.location()));
+			}
+
+			for(Player p : detectives){
+				dP.add(p.piece());
+				if(p.tickets().values().stream().allMatch(x -> x == 0)){ ref.counter ++;}
+				if(p.location() == this.mrX.location()){ ref.counter = -99999;} // mrx has been caught
+			}
+			if(ref.counter < 0){this.winner = ImmutableSet.copyOf(dP); return winner;} // mrx has been caught detectives win
+
+			if(XM.isEmpty()){ // mrX can't move, detectives win
+				this.winner = ImmutableSet.copyOf(dP);
+				return winner;
+			}
+
+			if ( ref.counter == this.detectives.size() || this.log.size() == setup.moves.size() ){
+				this.winner = ImmutableSet.of(this.mrX.piece());
+				return winner;
+			}
+
+			return this.winner;
+		}
+
+		private Optional<Player> PieceGetPlayer(Piece piecee){
 			var ref = new Object() {
 				Player id = null;
 			};
@@ -207,31 +240,33 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public ImmutableSet<Piece> getWinner() {
-			winner = ImmutableSet.of(); //testWinningPlayerIsEmptyInitially
+			/*winner = ImmutableSet.of(); //testWinningPlayerIsEmptyInitially
+			ArrayList<Piece> dP = new ArrayList<>();
+			HashSet<Move> XM = new HashSet<>();
 			var ref = new Object() {
 				int counter = 0;
 			};
-			detectives.forEach(p ->{
-				if (p.tickets().values().stream()/*.filter(x -> x>0)*/.count() == 0){
-					ref.counter = ref.counter + 1;}
 
-					/*while(p.tickets().values().iterator().hasNext()){
-						if()
-						}
-						//for(int i = 0; i<=4; i++){*/
-				//}
-			});
-
-			//if counter == num of detectives -> mrx is winner
-			if (ref.counter == detectives.size()){
-				winner = ImmutableSet.of(mrX.piece()); System.out.println("mrX wins, no more detective");
+			XM.addAll(makeSingleMoves(this.setup, this.detectives, mrX, mrX.location() ));
+			if(this.log.size() +2 <= this.setup.moves.size()){
+				XM.addAll(makeDoubleMoves(this.setup, this.detectives, mrX, mrX.location()));
 			}
 
-			//else if(){}
-			//if user-defined number of rounds has passed -> mrx is winner
-			//if detective/police finish a move on same location/station as mrX -> detective is winner
+			detectives.forEach(p ->{
+				dP.add(p.piece());
+				if (p.tickets().values().stream().count() == 0){ ref.counter = ref.counter + 1;}
+				if(p.location() == mrX.location()){ winner = ImmutableSet.copyOf(dP);} // mrx has been caught
 
-			return winner;
+			});
+			if(XM.isEmpty()){ // mrX can't move, detective wins
+				winner = ImmutableSet.copyOf(dP);
+			}
+
+			if ( (ref.counter == detectives.size() && winner.isEmpty()) || (log.size() == setup.moves.size() && ref.counter == detectives.size()) ){
+				winner = ImmutableSet.of(mrX.piece());
+			}
+			*/
+			return this.winner;
 		}
 
 		/**
@@ -240,12 +275,15 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		 */
 		@Nonnull
 		@Override
-		public ImmutableSet<Move> getAvailableMoves() {return AvMoves;}
+		public ImmutableSet<Move> getAvailableMoves() {
+			if(!winner.isEmpty()){this.AvMoves = ImmutableSet.of();}
+			System.out.println(this.AvMoves);
+			return this.AvMoves;
+		}
 
 		private static Set<SingleMove> makeSingleMoves
 				(GameSetup setup, List<Player> detectives, Player player, int source){
 			HashSet<SingleMove> sMoves = new HashSet<>(); //type inference
-			// player is the player that is making the move
 			// TODO create an empty collection of some sort, say, HashSet, to store all the SingleMove we generate
 
 			for(int destination1 : setup.graph.adjacentNodes(source)) { //int source = node, ie current piece position
