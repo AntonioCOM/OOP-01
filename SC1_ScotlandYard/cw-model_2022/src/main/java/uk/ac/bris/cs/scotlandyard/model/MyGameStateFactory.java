@@ -165,16 +165,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public Optional<Integer> getDetectiveLocation(Piece.Detective detective) {
-			/*var ref = new Object() {
-				Player id = null;
-			};
-
-			detectives.forEach((p) -> {
-				if(p.piece() == detective ){ref.id = p;} //&&!mrX	???
-			});
-			*/
 			Player id = PieceGetPlayer(detective).orElse(null);
-
 			if(id == null){return Optional.empty();}
 			return Optional.ofNullable(id.location()); // ref.id can't be null,due to .location. otherwise ofNullable is sufficient
 		}
@@ -186,18 +177,6 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
-			/*var ref = new Object() {
-				Player id = null;
-			};
-
-			if(piece.isMrX()){ref.id = mrX;}
-
-			else if (piece.isDetective()) {
-				detectives.forEach((p) -> {
-					//id = p.piece();
-					if (p.piece() == piece) {ref.id = p;}
-				});
-			}*/
 			Player id = PieceGetPlayer(piece).orElse(null);
 			if(id == null){return Optional.empty();}
 
@@ -219,22 +198,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		 */
 		@Nonnull
 		@Override
-		public ImmutableList<LogEntry> getMrXTravelLog() {
-			/*private static*/ ArrayList<LogEntry> GSFlog = new ArrayList<>();
-
-			//LogEntry a = LogEntry.hidden();
-			//LogEntry GSFlog = new LogEntry.hidden((mrX.tickets()).getOrDefault(null , ScotlandYard.Ticket()));
-			//ImmutableMap<ScotlandYard.Ticket, Integer> tickets
-			//mrX.tickets());
-			//(@Nonnull
-			//ScotlandYard.Ticket ticket)
-			//LogEntry GSFlog = new LogEntry.hidden();
-
-			// use builder etc???????
-
-			return log;
-			//return ImmutableList.copyOf(GSFlog);
-		}
+		public ImmutableList<LogEntry> getMrXTravelLog() { return ImmutableList.copyOf(log);} //return log;
 
 		/**
 		 * @return the winner of this game; empty if the game has no winners yet
@@ -276,20 +240,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		 */
 		@Nonnull
 		@Override
-		public ImmutableSet<Move> getAvailableMoves() {
-			// get avmoves from player in remaining, do this in constructor
-			return AvMoves; /*HashSet<Move> AMoves = new HashSet<>();
-			//return possible moves that can be done, maybe use remaining player rather than all players passed as parameter
-			for(Player p : detectives){
-				AMoves.addAll(makeSingleMoves(setup, detectives, p, p.location()));
-				AMoves.addAll(makeDoubleMoves(setup, detectives, p, p.location()));
-			}
-			AMoves.addAll(makeSingleMoves(setup, detectives, mrX, mrX.location()));
-			AMoves.addAll(makeDoubleMoves(setup, detectives, mrX, mrX.location()));
-
-			moves = ImmutableSet.copyOf(AMoves);
-			System.out.println(moves);
-			return ImmutableSet.copyOf(AMoves); // moves*/}
+		public ImmutableSet<Move> getAvailableMoves() {return AvMoves;}
 
 		private static Set<SingleMove> makeSingleMoves
 				(GameSetup setup, List<Player> detectives, Player player, int source){
@@ -380,7 +331,6 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			return dMoves;
 		}
 
-
 		/**
 		 * Computes the next game state given a move from {@link #getAvailableMoves()} has been
 		 * chosen and supplied as the parameter
@@ -393,8 +343,6 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Nonnull
 		@Override
 		public GameState advance(Move move) {
-			//System.out.println(remaining);
-			//System.out.println(AvMoves);
 			if(!AvMoves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
 			/*
 			// do I really need to use the visitor pattern
@@ -416,35 +364,30 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			GameState NewGS = move.accept(new Visitor<GameState>(){
 				int dm = 0;
 				@Override public GameState visit(SingleMove singleMove){
-					//System.out.println(remaining);
 					if(singleMove.commencedBy().isMrX()){
-
 						ArrayList<LogEntry> LE = new ArrayList<>(log);
-						if(setup.moves.get(log.size())) {
-							LE.add(LogEntry.reveal(singleMove.ticket, mrX.location()) );
+						if(setup.moves.get(LE.size())) {
+							LE.add(LogEntry.reveal(singleMove.ticket, singleMove.destination) );
 							log = ImmutableList.copyOf(LE);
 						}
-						else if(!setup.moves.get(log.size())){
+						else if(!setup.moves.get(LE.size())){
 							LE.add(LogEntry.hidden(singleMove.ticket));
 							log = ImmutableList.copyOf(LE);
 						}
-						mrX.use(singleMove.ticket);
 						mrX = mrX.at(singleMove.destination);
-
-						if(dm == 0) {
+						if(dm == 0) { // if it is a double move, first move skip this
 							ArrayList<Piece> DPieces = new ArrayList<>();
 							for (Player p : detectives) {
 								DPieces.add(p.piece());
 							}
 							remaining = ImmutableSet.copyOf(DPieces);
-							//System.out.println(remaining);
 						}
+						mrX = mrX.use(singleMove.ticket);
 						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
 					}
 
 					else if(singleMove.commencedBy().isDetective()){
 						Player p = PieceGetPlayer(singleMove.commencedBy()).get();
-						//System.out.println("player moving: " + p + "currently at: " + p.location());
 						int a = 0;
 						for(int i=0; i<detectives.size(); i++){
 							if(detectives.get(i).piece() == singleMove.commencedBy()){
@@ -453,9 +396,8 @@ public final class MyGameStateFactory implements Factory<GameState>{
 							}
 						}
 						p = p.at(singleMove.destination);
-						//System.out.println("moved to:" + p);
-						p.use(singleMove.ticket);
-						mrX.give(singleMove.ticket);
+						p = p.use(singleMove.ticket);
+						mrX = mrX.give(singleMove.ticket);
 						ArrayList <Player> dAL = new ArrayList<>(detectives);
 						dAL.add(a,p);
 						dAL.remove(a+1);
@@ -464,17 +406,16 @@ public final class MyGameStateFactory implements Factory<GameState>{
 						if(remaining.isEmpty()){
 							remaining = ImmutableSet.of(mrX.piece());
 						}
-						//System.out.println(remaining);
 						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
 
 					}
 					return null;
 				}
 				@Override public GameState visit(DoubleMove doubleMove){
-					//System.out.println("visit DM");
+
 					SingleMove FSM = new SingleMove(doubleMove.commencedBy(), doubleMove.source(), doubleMove.ticket1, doubleMove.destination1);
 					SingleMove SSM = new SingleMove(doubleMove.commencedBy(), doubleMove.destination1, doubleMove.ticket2, doubleMove.destination2);
-
+					mrX = mrX.use(Ticket.DOUBLE);
 					/*ArrayList<LogEntry> LE = new ArrayList<>(log);
 					if(setup.moves.get(log.size())) {
 						LE.add(LogEntry.reveal(FSM.ticket, mrX.location()) );
@@ -495,7 +436,6 @@ public final class MyGameStateFactory implements Factory<GameState>{
 					GameState xd;
 					xd = visit(FSM);
 					dm = 0;
-					//GameState y;
 					xd = visit(SSM);
 					return xd;
 				}
@@ -505,5 +445,4 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			return NewGS;
 		}
 	}
-
 }
