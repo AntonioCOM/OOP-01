@@ -70,7 +70,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 			this.log = checkNotNull(log,"Travel log(List<LogEntry>) can't be null");
 			this.mrX = checkNotNull(mrX,"mrX(player) can't be null");
 			this.detectives = checkNotNull(detectives,"detectives(List<Player>) can't be null");
-			this.winner = determineWinner();
+
 			HashSet<Move> AMoves = new HashSet<>();
 
 
@@ -94,6 +94,10 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				//3.create empty and compare
 				//method hasCycles doesn't work, can have 0 cycles and not be empty?*/ throw new IllegalArgumentException("Graph can't be empty!");}
 
+			System.out.println("constructor remaining:" + this.remaining);
+			System.out.println("constructor moves:" + this.AvMoves);
+			System.out.println("constructor winner:" + this.winner);
+
 			for (Piece p : this.remaining) {
 				AMoves.addAll(makeSingleMoves(this.setup, this.detectives, PieceGetPlayer(p).get(), PieceGetPlayer(p).get().location()));
 				if (this.log.size() + 2 <= this.setup.moves.size()) { // check if enough rounds left to make a double move
@@ -101,6 +105,16 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				}
 			}
 			this.AvMoves = ImmutableSet.copyOf(AMoves);
+			this.winner = determineWinner();
+
+			//solution: if detectives can't move, remaining must change to mrx
+
+			System.out.println("constructor remaining:1 " + this.remaining);
+			System.out.println("constructor moves:1 " + this.AvMoves);
+			System.out.println("constructor winner:1 " + this.winner);
+			System.out.println("(constructor)mrX location: " + mrX.location());
+			for(Player p: detectives){System.out.println("detectives location: "+ p.location());}
+
 		}
 
 		private ImmutableSet<Piece> determineWinner(){
@@ -266,6 +280,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 				winner = ImmutableSet.of(mrX.piece());
 			}
 			*/
+			System.out.println("getwinner: " + this.winner);
 			return this.winner;
 		}
 
@@ -277,7 +292,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 		@Override
 		public ImmutableSet<Move> getAvailableMoves() {
 			if(!winner.isEmpty()){this.AvMoves = ImmutableSet.of();}
-			System.out.println(this.AvMoves);
+			System.out.println("getAVMoves: "+this.AvMoves);
 			return this.AvMoves;
 		}
 
@@ -398,6 +413,10 @@ public final class MyGameStateFactory implements Factory<GameState>{
 
 			}*/ // just use visitor pattern. other way would require reflection pattern etc and will be more complicated
 
+			System.out.println("advance remaining:" + this.remaining);
+			System.out.println("advance moves:" + this.AvMoves);
+			System.out.println("advance winner:" + this.winner);
+
 
 			GameState NewGS = move.accept(new Visitor<GameState>(){
 				int dm = 0;
@@ -418,7 +437,7 @@ public final class MyGameStateFactory implements Factory<GameState>{
 							for (Player p : detectives) {
 								DPieces.add(p.piece());
 							}
-							remaining = ImmutableSet.copyOf(DPieces);
+							remaining = ImmutableSet.copyOf(DPieces); // after mrX has moved change remaing to detectives
 						}
 						mrX = mrX.use(singleMove.ticket);
 						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
@@ -441,7 +460,9 @@ public final class MyGameStateFactory implements Factory<GameState>{
 						dAL.remove(a+1);
 						detectives = ImmutableList.copyOf(dAL);
 						remaining = ImmutableSet.copyOf(remaining.stream().filter(x -> x !=singleMove.commencedBy()).toList());
-						if(remaining.isEmpty()){
+						ArrayList<Integer> dt = new ArrayList<>();
+
+						if(remaining.isEmpty() || remaining.stream().allMatch(x-> PieceGetPlayer(x).get().tickets().values().stream().allMatch(y -> y==0)  ) ){ // checks if detectives can still move, and switches remaining to mrX if requried
 							remaining = ImmutableSet.of(mrX.piece());
 						}
 						return new MyGameState(getSetup(), remaining, log, mrX, detectives);
@@ -480,6 +501,9 @@ public final class MyGameStateFactory implements Factory<GameState>{
 
 			});
 			if(NewGS == null){System.out.println("returned state is null");}
+			System.out.println("advance remaining:2 " + this.remaining);
+			System.out.println("advance moves:2 " + this.AvMoves);
+			System.out.println("advance winner:2 " + this.winner);
 			return NewGS;
 		}
 	}
